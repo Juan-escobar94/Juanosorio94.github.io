@@ -1,15 +1,15 @@
 module.exports = {
   pathPrefix: "/leonids",
   siteMetadata: {
-    title: `Leonids`,
+    title: `Juan Osorio`,
     author: {
-      name: `@ry_zou`,
+      name: `Juan A. Osorio Escobar`,
       summary: `web dev`,
     },
     description: `A simple, fixed sidebar two columns Gatsby.js blog starter.`,
-    siteUrl: `https://renyuanz.github.io/leonids`,
+    siteUrl: `https://juanosorio94.github.io/`,
     social: {
-      twitter: `ry_zou`,
+      twitter: ``,
     },
     defaultImage: "images/bg.jpeg",
   },
