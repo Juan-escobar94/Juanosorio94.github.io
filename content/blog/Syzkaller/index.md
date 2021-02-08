@@ -31,23 +31,18 @@ fuzzed.
 
 ## Running Syzkaller
 
-
 the main entry point of syzkaller is a program called 
 syz-manager, which is responsible for managing 
 the virtual machines. It also starts an http server which
 serves a dashboard with information about crashes,
 code coverage, etc.
 
-
 ## How Syzkaller works
 
 Syz-manager starts, monitors and restarts several VM instances, and
 starts a syz-fuzzer process inside of the VMs. The Syz-manager is
 responsible for persistent corpus and crash storage, it runs on a 
-host with a stable kernel which does not experiecne white-noise
-fuzzer load.
-
-![Syzkaller Architecture](https://github.com/google/syzkaller/blob/master/docs/process_structure.png?raw=true)
+host with a stable kernel. 
 
 The syz-fuzzer is the process that runs inside the VMs (whose kernel
 are the fuzzing target). The syz-fuzzer guides the fuzzing process
@@ -64,6 +59,13 @@ as possible, so it does not interfere with the fuzzing at all. It is
 compiled as a static binary and commmunicates with syz-fuzzer using
 shared memory.
 
+Programs passed to syz-executor are in binary represenation, they
+are actually interpreted by `/prog/decodeexec.go`.
+
+The following diagram depicts the architecture of syzkaller, red colored
+text are configurable options:
+
+![Syzkaller Architecture](https://github.com/google/syzkaller/blob/master/docs/process_structure.png?raw=true)
 ## Syzkaller VMs
 
 There are some generic requirements of a Syzkaller VM:
@@ -97,16 +99,95 @@ a very different function, the need to describe this behaviour
 gave entrance to syzkallers system call description language,
 syzlang.
 
-inside syzkaller's source tree, this definitions are found
-inside /sys/[operatingsystem]/\*.txt files.
+The ability to define system calls in this manner, allows syzkaller to
+understand dependencies based input and output variables, which are
+defined as resources in syzlang. This makes it possible to create
+dependencies between system calls, meaning: a system call that
+creates a resource, will precede a systemcall that takes this resource
+as an argument.
+
+As an example:
+
+```
+r0 = open(&(0x7f000000000)="./file0", 0x3, 0x9)
+read(r0, &(0x7f0000000100), 42)
+close(r0)
+```
+
+Here, r0 reprensents a resource (a file descriptor), 
+which is required for further system calls, namely read and close.
+
+### Program mutation
+
+Based on the coverage metric, syzkaller mutates programs of the corpus,
+it applies this transformations:
+
+* Insert/remove system calls
+* Change Arguments:
+  * resize Arrays/Buffers
+  * change union options
+  * flags (e.g. file access)
+  * len/bytesize
+  * filename
+  * pointers
+* Taditional mutation of blobs:
+  * flip bits, insert/remove bytesm etc.
+* Splicing of programs
+  * based on resources
+
+#### Priorization 
+
+Mutations applied are selected based on priorization
+criteria, which is done on multiple levels:
+
+* Program: 
+  * When choosing a program from a corpus, the main criteria to back this decision are complexity (number of syscalls, number of args, complexity of args) and coverage.
+
+  * On program mutation heuristics are applied. For example, removing a system call does not *usually* cause as much impact on code coverage as adding a system call.
+
+* system call:
+  * system calls are selected based on their argument complexity (the more complex, the better), 
+  * static relation to system calls already in the program (system calls that use sockets will be prefered against system calls that use filesystem, if a program already contains system calls that use sockets)
+  * Dynamic relation to existing system calls. This works 
+  similarly to reinforced learning, system calls that 
+  frequently appear together (even if we dont know why),
+  it is assumed that there must be a relation between them,
+  and this system calls will get inserted into programs 
+  more frequently.
+
+* Argument selection:
+  * Complexity: arguments with bigger search space get preferred, just because there are more values to test.(64 bit int vs 8 bit int, for example)
+  * heuristics: changing exact values of pointers usually
+  doesnt provoke new behaviours mor trigger bugs.
+
+* Argument generation
+  * Resources: frequency of default values (0/1 for fd)
+  * flags: how many bits to set
+  * ints: how often do we use 0? (most of the times special value, hence use more often) 
+
+
+[^1].
+
+
+## Extending syzkaller subsystems
+
+inside syzkaller's source tree, definitions for system calls are found
+inside `/sys/[operatingsystem]/*.txt` files.
 
 A program is a sequence of syscalls with concrete values for 
-arguments.
+arguments. 
 
-Programs passed to syz-executor are in binary represenation, they
-are actually interpreted by /prog/decodeexec.go
+Inside the text files syzkaller subsystems are defined using syzlang.
+This language allows syzkaller to know about argument types, system call 
+inter dependencies and further differentiate things which are treated 
+equally in the C language, which makes a lot of sense when defining a subsystem.
 
-# Syzlang
+Take as an example the ioctl system call interface, which is kept very general 
+for very good reasons, but is also a whole different thing in between different
+devices. Syzlang allows a logical differentiation of arguments and instances of 
+ioctls.
+
+### Syzlang
 
 A "Pseudo-formal" grammar used to describe syscalls:
 
@@ -122,6 +203,18 @@ type-options = [type-opt ["," type-opt]]
 ```
 
 
+## Fault injection
+
+Fault injection is another kernel compilation option 
+which is useful for fuzzing the kernel.
+
+Explicitly fail kmalloc, page_alloc, futex, IO. This
+is very meaningful in kernel code, because it tests
+error handling functions, which could provoke a 
+crash if done incorrectly.
+
+Systemic fault injection is also possible (fail every
+nth-call).
 
 ## Crashes
 
@@ -143,5 +236,7 @@ the process of finding a crash reprodution is
 "automated to some degree" with another 
 tool inside syzkaller, called syz-repro.
 In order to run syz-repro, pass the syzmanager
-config file and the crsah report file.
+config file and the crash report file.
 
+
+[^1]: https://www.youtube.com/watch?v=YwX4UyXnhz0&ab_channel=MicrosoftIsraelR%26DCenter
