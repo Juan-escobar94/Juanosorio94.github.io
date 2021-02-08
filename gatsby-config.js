@@ -4,9 +4,9 @@ module.exports = {
     title: `Juan Osorio`,
     author: {
       name: `Juan A. Osorio Escobar`,
-      summary: `web dev`,
+      summary: `CS Student / Web Developer`,
     },
-    description: `A simple, fixed sidebar two columns Gatsby.js blog starter.`,
+    description: ``,
     siteUrl: `https://juanosorio94.github.io/`,
     social: {
       twitter: ``,
@@ -52,12 +52,6 @@ module.exports = {
     },
     `gatsby-transformer-sharp`,
     `gatsby-plugin-sharp`,
-    {
-      resolve: `gatsby-plugin-google-analytics`,
-      options: {
-        trackingId: `UA-62251910-1`,
-      },
-    },
     `gatsby-plugin-feed`,
     {
       resolve: `gatsby-plugin-manifest`,
@@ -80,7 +74,7 @@ module.exports = {
     },
     // this (optional) plugin enables Progressive Web App + Offline functionality
     // To learn more, visit: https://gatsby.dev/offline
-    `gatsby-plugin-offline`,
+    //`gatsby-plugin-offline`,
     "gatsby-plugin-dark-mode",
     `gatsby-plugin-postcss`,
   ],
